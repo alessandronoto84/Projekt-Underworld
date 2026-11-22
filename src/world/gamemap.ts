@@ -41,6 +41,8 @@ export class GameMap {
   readonly warps: Warp[] = [];
   readonly lights: LightDef[];
   readonly waterTiles: [number, number][] = [];
+  /** Schornsteine (Weltkoordinaten) für Rauch-Effekte. */
+  readonly chimneys: { x: number; y: number }[] = [];
   groundCanvas!: HTMLCanvasElement;
 
   constructor(readonly def: MapDef) {
@@ -112,10 +114,29 @@ export class GameMap {
         case 'tallgrass': this.add({ sprite: sprite(`tallgrass:${seed % 4}`, () => O.drawTallGrass(seed % 4 + 1)), dx: X, dy: Y, sortY: Y + 15 }); break;
         case 'barrel': this.solidSprite(o.x, o.y, sprite('barrel', O.drawBarrel), 1, -2, o.action, o.action === 'well' ? 'Regentonne' : 'Fass'); break;
         case 'crate': this.solidSprite(o.x, o.y, sprite('crate', O.drawCrate), 0, 0); break;
-        case 'trash': this.solidSprite(o.x, o.y, sprite('trash', O.drawTrashBin), 1, -2); break;
+        case 'trash': this.solidSprite(o.x, o.y, sprite('trash', O.drawTrashBin), 1, -2, `trash:${id}:${o.x}:${o.y}`, 'Mülltonne'); break;
         case 'lamp': this.solidSprite(o.x, o.y, sprite('lamp', O.drawLampPost), 2, 16 - 36); break;
         case 'mailbox': this.solidSprite(o.x, o.y, sprite('mailbox', O.drawMailbox), 2, -4, o.action, 'Briefkasten'); break;
         case 'busstop': this.solidSprite(o.x, o.y, sprite('busstop', O.drawBusStop), 0, -20, o.action, 'Bushaltestelle'); break;
+        case 'log': {
+          this.add({ sprite: sprite('log', O.drawLog), dx: X, dy: Y + 2, sortY: Y + 14 });
+          this.setSolid(o.x, o.y); this.setSolid(o.x + 1, o.y);
+          break;
+        }
+        case 'stump': this.solidSprite(o.x, o.y, sprite('stump', O.drawStump), 0, 2); break;
+        case 'hochsitz': {
+          this.add({ sprite: sprite('hochsitz', O.drawHuntingStand), dx: X - 4, dy: Y + 16 - 44, sortY: Y + 14, shadow: { x: X + 8, y: Y + 14, rx: 12, ry: 3 } });
+          this.setSolid(o.x, o.y); this.setSolid(o.x + 1, o.y);
+          this.interactables.push({ rect: { x: o.x, y: o.y, w: 2, h: 1 }, action: 'text', text: 'Ein alter Hochsitz. In das Holz ist „T.“ geritzt.', label: 'Hochsitz' });
+          break;
+        }
+        case 'kushMother': {
+          this.add({ sprite: sprite('kushMother', () => O.drawForage('kushMother')), dx: X, dy: Y + 16 - 22, sortY: Y + 14 });
+          this.setSolid(o.x, o.y);
+          this.interactables.push({ rect: { x: o.x, y: o.y, w: 1, h: 1 }, action: 'kushMother', label: 'Mutterpflanze' });
+          this.lights.push({ x: X + 8, y: Y + 2, r: 16, color: 'rgba(192,122,224,0.5)', night: true });
+          break;
+        }
         case 'dumpster': {
           this.add({ sprite: sprite('dumpster', O.drawDumpster), dx: X, dy: Y - 6, sortY: Y + 14 });
           this.setSolid(o.x, o.y); this.setSolid(o.x + 1, o.y);
@@ -162,6 +183,7 @@ export class GameMap {
     const s = sprite(`bld:${this.def.id}:${o.x}:${o.y}:${seed}`, () => O.drawBuilding(o.spec));
     const bottom = (o.y + 1) * TILE;
     this.add({ sprite: s, dx: o.x * TILE - 4, dy: bottom - (4 + o.spec.roofH + o.spec.wallH), sortY: bottom - 2 });
+    if (o.spec.chimney) this.chimneys.push({ x: o.x * TILE - 4 + 4 + o.spec.widthTiles * TILE - 20 + 2, y: bottom - (4 + o.spec.roofH + o.spec.wallH) + 1 });
     const footRows = Math.max(2, Math.ceil(o.spec.wallH / TILE));
     for (let y = o.y - footRows + 1; y <= o.y; y++) for (let x = o.x; x < o.x + o.spec.widthTiles; x++) this.setSolid(x, y);
     const doorX = o.x + o.spec.door;

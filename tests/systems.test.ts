@@ -212,7 +212,7 @@ describe('Imperium & Migration', () => {
     raw.flags = { tutorialDone: true, knowsMondrosinen: true };
     raw.quest = { step: 12, progress: 0 };
     const s = deserialize(JSON.stringify(raw));
-    expect(s.version).toBe(2);
+    expect(s.version).toBe(3);
     expect(countItem(s, 'cannabis')).toBe(4);
     expect(countItem(s, 'mondrosinen')).toBe(0);
     expect(s.money).toBe(100 + 2 * 95);
@@ -223,5 +223,72 @@ describe('Imperium & Migration', () => {
     expect(s.quest.step).toBe(13);
     expect(s.flags.unlock_street).toBe(true);
     expect(s.flags.knowsMondrosinen).toBeUndefined();
+  });
+});
+
+describe('Lebendige Welt & Geschichte', () => {
+  it('legt täglich Fundstücke aus und man kann sie aufheben', async () => {
+    const { spawnForage, pickForage } = await import('../src/systems/forage');
+    const c = ctx();
+    spawnForage(c.s, () => true);
+    const woods = c.s.forage.woods ?? [];
+    expect(woods.length).toBeGreaterThanOrEqual(6);
+    const r = pickForage(c, 'woods', woods[0]);
+    expect(r.ok).toBe(true);
+    expect(r.got.length).toBeGreaterThan(0);
+    expect(c.s.forage.woods).toHaveLength(woods.length - 1);
+  });
+  it('Mülltonnen lassen sich nur einmal pro Tag durchsuchen', async () => {
+    const { searchTrash } = await import('../src/systems/forage');
+    const c = ctx();
+    expect(searchTrash(c, 'trash:a').ok).toBe(true);
+    expect(searchTrash(c, 'trash:a').ok).toBe(false);
+    endDay(c, false, OUT);
+    expect(searchTrash(c, 'trash:a').ok).toBe(true);
+  });
+  it('Akt 1 startet nach dem Tutorial und folgt den Ereignissen', async () => {
+    const { Quests } = await import('../src/systems/quests');
+    const c = ctx();
+    const q = new Quests(c);
+    c.s.quest.step = 99; c.s.flags.tutorialDone = true;
+    q.checkGoals();
+    expect(c.s.lines.akt1?.step).toBe(0);
+    c.bus.emit('talked', { npc: 'viktor' });
+    expect(c.s.lines.akt1.step).toBe(1);
+    expect(c.s.vars.debtDue).toBe(c.s.time.day + 7);
+    c.bus.emit('talked', { npc: 'rico' });
+    expect(c.s.flags.chestUnlocked).toBe(true);
+    c.bus.emit('flagSet', { flag: 'chestLooted' });
+    c.bus.emit('flagSet', { flag: 'readNotebook' });
+    c.bus.emit('flagSet', { flag: 'kushFound' });
+    c.bus.emit('harvested', { item: 'kush_frisch', qty: 4 });
+    expect(c.s.lines.akt1.step).toBe(6);
+    expect(q.npcOptions('viktor')[0].action).toBe('pay:debt:debtPaid');
+    c.bus.emit('flagSet', { flag: 'debtPaid' });
+    expect(c.s.lines.akt1.done).toBe(true);
+    expect(c.s.flags.act1Done).toBe(true);
+  });
+  it('verpasste Frist kostet Geld und erhöht die Schuld', async () => {
+    const { Quests } = await import('../src/systems/quests');
+    const c = ctx();
+    const q = new Quests(c);
+    c.s.quest.step = 99; c.s.flags.tutorialDone = true; c.s.flags.debtKnown = true;
+    c.s.lines.akt1 = { step: 6, progress: 0 };
+    c.s.vars.debtDue = 1; c.s.vars.debt = 2000; c.s.money = 1000; c.s.time.day = 3;
+    q.checkGoals();
+    expect(c.s.money).toBe(500);
+    expect(c.s.vars.debt).toBe(2500);
+    expect(c.s.vars.debtDue).toBe(6);
+  });
+  it('Nebenquest: Mara vergibt sie, Schlüssel liegt im Park', async () => {
+    const { Quests } = await import('../src/systems/quests');
+    const c = ctx();
+    const q = new Quests(c);
+    c.s.quest.step = 99; c.s.flags.tutorialDone = true;
+    expect(q.offerFor('mara')?.id).toBe('mara');
+    q.startLine('mara');
+    expect(c.s.forage.town?.some((f) => f.id === 'mara_keys')).toBe(true);
+    c.bus.emit('looted', { item: 'mara_schluessel', qty: 1, map: 'town' });
+    expect(c.s.lines.mara.step).toBe(1);
   });
 });

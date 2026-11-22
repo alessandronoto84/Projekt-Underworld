@@ -40,9 +40,19 @@ Stand: Tag der Neuausrichtung. Technik: TypeScript + Vite, eigene Canvas-Engine,
 Alle Herstellungsschritte sind reine Spielwerte: Eingabe-Gegenstand + Maschine + Zeit → Ware.
 Keine realen Rezepturen, Chemikalien, Mengenangaben oder Verfahren.
 
-## 4. Fehlende Systeme (Reihenfolge der Umsetzung)
+## 4. Umgesetzt in Phase 2 („Lebendige Welt“)
 
-1. **Jetzt:** Inhaltsumstellung, Imperium-Stufen, Straßenverkauf, Migration
+- Wald-Gebiet südlich des Grundstücks (Lichtungen, Bach, Teich, Hochsitz)
+- Fundstücke täglich neu: wilder Hanf, Psilo-Pilze, Pfandflaschen, alte Uhren; Mülltonnen durchsuchbar
+- Neue Waren: Greenfield Kush (Theos Spezialsorte), Psilo-Pilze; Trocknen im Gestell
+- Passanten mit eigenen Wegen, nachts teils Kundschaft (Direktverkauf)
+- Tiere: Tauben und Krähen (fliegen auf), Katzen und Hunde (streicheln), Enten
+- Atmosphäre: Schmetterlinge, Glühwürmchen, Schornsteinrauch, fallendes Laub, Regenspritzer
+- Hauptgeschichte Akt 1 „Theos Schulden“ mit Frist und Konsequenzen; 3 Nebenquests; Questbuch (J)
+
+## 5. Fehlende Systeme (Reihenfolge der Umsetzung)
+
+1. Akt 2 der Hauptgeschichte (Old Guard, „der Alte“)
 2. Darknet-Oberfläche (Laptop), Smartphone als App-Sammlung (Kontakte, Nachrichten, Finanzen, Karte)
 3. Neue Stadtviertel (Southside, Nightlife District zuerst), mehr NPCs, Zufallsereignisse
 4. Fraktionen mit Ruf/Beziehungen, Fraktionsmissionen, Hauptgeschichte

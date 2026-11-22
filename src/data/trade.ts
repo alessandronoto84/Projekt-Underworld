@@ -25,17 +25,17 @@ export interface Shop {
 export const CHANNELS: Record<string, Channel> = {
   kramer: {
     id: 'kramer', name: 'Kramers Laden', blurb: 'Legal und unauffällig. Kauft Gemüse.',
-    buys: [{ item: 'tomate', price: 22 }],
+    buys: [{ item: 'tomate', price: 22 }, { item: 'pfandflasche', price: 2 }, { item: 'alte_uhr', price: 40 }],
     saturation: 0.02, recovery: 0.5,
   },
   rico: {
     id: 'rico', name: 'Rico (Abnehmer)', blurb: 'Nimmt große Mengen. Zahlt weniger als die Straße, fragt nicht viel.',
-    buys: [{ item: 'cannabis', price: 32 }, { item: 'ecstasy', price: 22 }, { item: 'kokain', price: 90 }],
+    buys: [{ item: 'cannabis', price: 32 }, { item: 'kush', price: 55 }, { item: 'pilze', price: 24 }, { item: 'ecstasy', price: 22 }, { item: 'kokain', price: 90 }],
     saturation: 0.015, recovery: 0.4, unlockFlag: 'metRico',
   },
   strasse: {
     id: 'strasse', name: 'Straßenkunden (Old Town)', blurb: 'Abends im Park. Beste Preise – aber die Kundschaft ist schnell versorgt.',
-    buys: [{ item: 'cannabis', price: 48 }, { item: 'ecstasy', price: 34 }, { item: 'kokain', price: 135 }],
+    buys: [{ item: 'cannabis', price: 48 }, { item: 'kush', price: 80 }, { item: 'pilze', price: 36 }, { item: 'ecstasy', price: 34 }, { item: 'kokain', price: 135 }],
     saturation: 0.07, recovery: 0.45, unlockFlag: 'unlock_street',
   },
 };

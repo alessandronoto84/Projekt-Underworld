@@ -4,6 +4,8 @@ import type { Dir } from '../core/types';
 import type { GameState } from '../systems/state';
 import { weekday } from '../systems/time';
 
+const lineStep = (s: GameState, id: string): number => { const st = s.lines?.[id]; return !st ? -1 : st.done ? 999 : st.step; };
+
 /** Ein Eintrag im Tagesablauf: ab Minute `at` befindet sich der NPC an (map,x,y). map=null → unterwegs/zuhause (unsichtbar). */
 export interface ScheduleEntry { at: number; map: string | null; x: number; y: number; dir?: Dir }
 
@@ -52,6 +54,12 @@ export const NPCS: Record<string, NpcDef> = {
         'Dann ab ins Trockengestell neben dem Haus. Bring mir fünf Einheiten – tagsüber in der Gasse neben der Bar, abends im „Rostigen Anker“.',
       ] },
       { when: (s) => s.quest.step === 11, lines: ['Hast du die fünf Einheiten? Dann reden wir übers Geschäft.'] },
+      { when: (s) => lineStep(s, 'akt1') === 1, lines: [
+        'Viktor war bei dir? Verdammt. Der treibt Geld für die Old Guard ein – die alten Familien, denen halb Old Town gehört.',
+        'Theo hat sich bei denen Geld geliehen, um das Grundstück zu halten. Zweitausend, wenn ich mich richtig erinnere.',
+        'Aber Theo hatte immer irgendwo was versteckt. Schau in seine alte Kiste. Er stand auf doppelte Böden.',
+      ] },
+      { when: (s) => lineStep(s, 'akt1') === 5, lines: ['Greenfield Kush! Theo hat die Sorte jahrelang gezüchtet. Die Straße zahlt dafür fast das Doppelte.'] },
       { when: (s) => s.quest.step === 12, lines: ['Ich zahl fair, aber die Straße zahlt mehr. Dex hängt abends im Park rum. Sag ihm, ich schick dich.'] },
       { when: (s) => !!s.flags.stage3, lines: ['Kokain ist ein anderes Kaliber. Mehr Geld, mehr Augen auf dir. Pass auf, wem du was verkaufst.', 'Die Harbor Kings fragen nach dir. Das ist gut – oder sehr schlecht.'] },
       { when: (s) => !!s.flags.stage2, lines: ['Pillen laufen in den Clubs wie verrückt. Mit einer Presse verdienst du richtig.', 'Das Neon Syndicate kontrolliert die Clubszene. Irgendwann musst du mit denen reden.'] },
@@ -128,6 +136,7 @@ export const NPCS: Record<string, NpcDef> = {
       { at: h(21, 30), map: null, x: 0, y: 0 },
     ],
     dialogue: [
+      { when: (s) => !!s.flags.maraFriend, lines: ['Im Nightlife District gibt es einen Club, das „Neon“. Da laufen die richtig großen Geschäfte.', 'Danke nochmal wegen der Schlüssel. Du hast was gut bei mir.', 'Die Leute vom Neon Syndicate suchen immer Lieferanten. Aber die sind wählerisch.'] },
       { lines: ['Du bist neu hier, oder? Theos Grundstück stand ewig leer.', 'Abends riecht es bei dir draußen manchmal … interessant.', 'Ich arbeite im Nightlife District. Wenn die Bus-Linie wieder fährt, zeig ich dir die Clubs.'] },
     ],
   },
@@ -148,6 +157,36 @@ export const NPCS: Record<string, NpcDef> = {
     dialogue: [
       { when: (s) => s.stats.sold > 30, lines: ['Komisch. In letzter Zeit ist im Park ziemlich viel los. Sie wissen nicht zufällig etwas darüber?'] },
       { lines: ['Guten Tag. Alles in Ordnung bei Ihnen?', 'Greenfield ist eine ruhige Stadt. Und das soll auch so bleiben.', 'Sie wohnen auf Theos altem Grundstück? Interessant. Sehr interessant.'] },
+    ],
+  },
+  viktor: {
+    id: 'viktor', name: 'Viktor', title: 'Geldeintreiber der Old Guard',
+    look: {
+      skin: P.skin0, skinShade: P.skin1, hair: P.s4, hairShade: P.s3, hairStyle: 'short',
+      shirt: P.white, shirtShade: P.cream, pants: P.ink, pantsShade: P.outline, shoes: P.ink,
+      jacket: P.s0, jacketShade: P.ink, glasses: true,
+    },
+    schedule: (s) => {
+      const st = lineStep(s, 'akt1');
+      if (st < 0) return [{ at: 0, map: null, x: 0, y: 0 }];
+      if (st === 0) return [{ at: 0, map: 'farm', x: 9.5, y: 12.6, dir: 'up' }];
+      return [
+        { at: 0, map: null, x: 0, y: 0 },
+        { at: h(12), map: 'town', x: 28.5, y: 21.6, dir: 'down' },
+        { at: h(17), map: null, x: 0, y: 0 },
+        { at: h(19), map: 'bar', x: 11.5, y: 8.6, dir: 'left' },
+        { at: h(25), map: null, x: 0, y: 0 },
+      ];
+    },
+    dialogue: [
+      { when: (s) => lineStep(s, 'akt1') === 0, lines: [
+        'Du bist also der Erbe. Mein Beileid. Ich bin Viktor.',
+        'Ich arbeite für Leute, denen dein Onkel zweitausend Dollar schuldet. Schulden sterben nicht mit dem Schuldner.',
+        'Sieben Tage. Dann hole ich das Geld. So oder so.',
+      ] },
+      { when: (s) => !!s.flags.debtPaid, lines: ['Pünktlich und vollständig. Der Alte mag so etwas.', 'Man wird von dir hören. Bald.'] },
+      { when: (s) => !!s.flags.debtKnown, lines: ['Die Uhr tickt.', 'Ich hoffe, du hast das Geld zusammen.', 'Ich mag dich. Mach nicht, dass ich das ändern muss.'] },
+      { lines: ['…'] },
     ],
   },
   jules: {

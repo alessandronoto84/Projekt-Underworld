@@ -18,7 +18,7 @@ export type FurnitureArt =
 
 export type MapObjectDef =
   | { kind: 'tree'; x: number; y: number; variant: 'oak' | 'pine' | 'birch' }
-  | { kind: 'bush' | 'rock' | 'flowers' | 'tallgrass' | 'barrel' | 'crate' | 'trash' | 'lamp' | 'mailbox' | 'bench' | 'busstop' | 'berrybush' | 'dumpster'; x: number; y: number; action?: string }
+  | { kind: 'bush' | 'rock' | 'flowers' | 'tallgrass' | 'barrel' | 'crate' | 'trash' | 'lamp' | 'mailbox' | 'bench' | 'busstop' | 'berrybush' | 'dumpster' | 'log' | 'stump' | 'hochsitz' | 'kushMother'; x: number; y: number; action?: string }
   | { kind: 'sign'; x: number; y: number; text: string; color?: string }
   | { kind: 'fence'; x: number; y: number; len: number; vertical?: boolean }
   | { kind: 'car'; x: number; y: number; color: string }

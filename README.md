@@ -24,7 +24,7 @@ Sprite-Galerie für Grafik-Reviews: `http://localhost:5173/tools/sprites.html?sc
 - **Leertaste / Linksklick** Werkzeug oder Gegenstand benutzen
 - **E / Rechtsklick** sprechen, ernten, Maschinen bedienen
 - **1–8 / Mausrad** Gegenstand wählen
-- **I** Inventar · **H** Handel · **M** Karte · **Esc** Menü
+- **I** Inventar · **J** Questbuch · **H** Handel · **M** Karte · **Esc** Menü
 
 ## Dokumentation
 

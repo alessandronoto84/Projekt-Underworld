@@ -5,10 +5,18 @@ import { P } from '../art/palette';
 import type { Look } from '../art/characters';
 import { Actor } from '../entities/actor';
 import { Npc } from '../entities/npc';
+import { Animal } from '../entities/animal';
+import { Walker } from '../entities/walker';
+import { ANIMALS, WALKERS } from '../data/life';
+import { FORAGE } from '../data/forage';
+import { forageAt, pickForage, searchTrash, spawnForage } from '../systems/forage';
+import { addMoney } from '../systems/state';
+import { Ambient } from './ambient';
 import { GameMap } from '../world/gamemap';
 import { FARM } from '../data/maps/farm';
 import { TOWN } from '../data/maps/town';
 import { BAR, HOME, SHOP } from '../data/maps/interiors';
+import { WOODS } from '../data/maps/woods';
 import type { MapDef, Warp } from '../world/mapdef';
 import { ITEMS } from '../data/items';
 import { CROPS } from '../data/crops';
@@ -23,12 +31,13 @@ import { buy, deliverOrder, sell } from '../systems/market';
 import { endDay } from '../systems/day';
 import { Quests } from '../systems/quests';
 import { browserStorage, hasSave, loadGame, saveGame } from '../systems/save';
-import { REAL_SECONDS_PER_MINUTE, formatDuration, weekday } from '../systems/time';
+import { REAL_SECONDS_PER_MINUTE, darkness, formatDuration, weekday } from '../systems/time';
+import { quote, unitPrice } from '../systems/market';
 import { UI, type MenuOption } from '../ui/ui';
 import { Renderer } from './renderer';
 import { Sound } from './sfx';
 
-const MAP_DEFS: MapDef[] = [FARM, TOWN, HOME, SHOP, BAR];
+const MAP_DEFS: MapDef[] = [FARM, TOWN, WOODS, HOME, SHOP, BAR];
 const OUTDOOR = new Set(MAP_DEFS.filter((m) => m.outdoor).map((m) => m.id));
 
 const PLAYER_LOOK: Look = {
@@ -58,6 +67,9 @@ export class Game {
   map!: GameMap;
   readonly player = new Player();
   npcs: Npc[] = [];
+  animals: Animal[] = [];
+  walkers: Walker[] = [];
+  readonly ambient = new Ambient();
   particles: Particle[] = [];
   targetTile: { x: number; y: number } | null = null;
   showTarget = false;
@@ -123,6 +135,19 @@ export class Game {
     this.npcs = Object.values(NPCS).map((d) => new Npc(d));
     this.notified.clear();
     for (const m of Object.values(s.machines).flat()) if (machineStatus(s, m).state === 'done') this.notified.add(m.uid);
+    if (s.vars.forageDay !== s.time.day) this.spawnDaily();
+  }
+
+  /** Tägliche Fundstücke auslegen. */
+  private spawnDaily(): void {
+    const s = this.ctx.s;
+    spawnForage(s, (mapId, x, y) => {
+      const m = this.maps[mapId];
+      if (!m || m.isSolid(x, y) || m.isFarmable(x, y) || soilAt(s, mapId, x, y) || machineAt(s, mapId, x, y) || m.interactableAt(x, y)) return false;
+      if (m.warps.some((w) => x >= Math.floor(w.x) && x < w.x + w.w && y >= Math.floor(w.y) && y < w.y + w.h)) return false;
+      return ['grass', 'grassDark', 'dirt', 'sand', 'pavement'].includes(m.groundAt(x, y));
+    });
+    s.vars.forageDay = s.time.day;
   }
 
   private beginPlay(): void {
@@ -147,9 +172,10 @@ export class Game {
 
   private wireEvents(): void {
     const bus = this.ctx.bus;
-    bus.on('questChanged', () => this.sfx.play('quest'));
+    bus.on('questChanged', () => { this.sfx.play('quest'); if (this.map) this.syncNpcs(false); });
     bus.on('enteredMap', (e) => { if (e.map === 'town' && !this.ctx.s.flags.visitedTown) { this.ctx.s.flags.visitedTown = true; this.ui.renderMenuButtons(); } });
     bus.on('unlocked', (e) => { if (e.feature === 'trade') this.sfx.play('coin'); });
+    bus.on('questDone', (e) => { this.sfx.play('quest'); setTimeout(() => this.ui.narrate(e.text), 400); });
   }
 
   /* ============================================================== Loop */
@@ -177,7 +203,7 @@ export class Game {
 
   private update(dt: number): void {
     this.updateParticles(dt);
-    if (!this.playing) { this.updateNpcs(dt, false); return; }
+    if (!this.playing) { this.updateNpcs(dt, false); this.ambient.update(dt, this); return; }
     const inp = this.input;
 
     if (this.ui.blocking) {
@@ -186,6 +212,7 @@ export class Game {
       else if (inp.wasPressed('inventory') && this.ui.modalOpen === 'inventory') this.ui.closeModal();
       else if (inp.wasPressed('trade') && this.ui.modalOpen === 'trade') this.ui.closeModal();
       else if (inp.wasPressed('map') && this.ui.modalOpen === 'map') this.ui.closeModal();
+      else if (inp.wasPressed('journal') && this.ui.modalOpen === 'journal') this.ui.closeModal();
       this.ui.setHint('');
       return;
     }
@@ -195,6 +222,7 @@ export class Game {
     if (inp.wasPressed('trade')) { if (this.ctx.s.flags.unlock_trade) this.ui.toggle('trade'); else this.toastOnce('trade', 'Den Handel schaltest du im Spielverlauf frei.'); return; }
     if (inp.wasPressed('map')) { if (this.ctx.s.flags.visitedTown) this.ui.toggle('map'); return; }
     if (inp.wasPressed('menu')) { this.ui.toggle('menu'); return; }
+    if (inp.wasPressed('journal')) { if (!this.quests.inTutorial) this.ui.toggle('journal'); return; }
     const n = inp.takeNumber();
     if (n !== null && n < HOTBAR_SIZE) this.setSelected(n);
     const wheel = inp.takeWheel();
@@ -203,6 +231,7 @@ export class Game {
     this.updateClock(dt);
     this.updatePlayer(dt);
     this.updateNpcs(dt, true);
+    this.ambient.update(dt, this);
     this.updateTarget();
     this.handleActions();
     this.checkMachines();
@@ -219,7 +248,7 @@ export class Game {
     while (this.timeAcc >= REAL_SECONDS_PER_MINUTE) {
       this.timeAcc -= REAL_SECONDS_PER_MINUTE;
       s.time.minute += 1;
-      if (s.time.minute % 10 === 0) this.syncNpcs(false);
+      if (s.time.minute % 10 === 0) { this.syncNpcs(false); this.populateWalkers(); }
       if (s.time.minute >= DAY_END) { s.time.minute = DAY_END; this.passOut(); return; }
       if (s.time.minute === 24 * 60) this.toast('Mitternacht. Du solltest bald schlafen gehen.');
     }
@@ -313,6 +342,8 @@ export class Game {
     this.particles = [];
     this.syncPlayerToState();
     this.syncNpcs(true);
+    this.spawnLife();
+    this.ambient.reset();
     if (emit) this.ctx.bus.emit('enteredMap', { map: id });
   }
 
@@ -324,6 +355,47 @@ export class Game {
 
   private updateNpcs(dt: number, _active: boolean): void {
     for (const n of this.npcs) if (n.map === this.map.def.id) n.update(dt);
+    for (const a of this.animals) a.update(dt, this.player.x, this.player.y);
+    for (const w of this.walkers) w.update(dt);
+  }
+
+  /** Tiere und Passanten für die aktuelle Karte erzeugen. */
+  private spawnLife(): void {
+    const night = darkness(this.ctx.s.time.minute) > 0.6;
+    this.animals = [];
+    for (const a of ANIMALS) {
+      if (a.map !== this.map.def.id || (night && !a.night)) continue;
+      for (let i = 0; i < a.count; i++) this.animals.push(new Animal(a.kind, a.zone, this.map, i, a.name));
+    }
+    this.walkers = [];
+    this.populateWalkers();
+  }
+
+  /** Passantenzahl an die Tageszeit anpassen (nachts teils Kundschaft). */
+  private populateWalkers(): void {
+    const area = WALKERS.find((w) => w.map === this.map.def.id);
+    if (!area) { this.walkers = []; return; }
+    const h = this.ctx.s.time.minute / 60;
+    const night = h >= 21 || h < 6;
+    const target = night ? area.night : h >= 18 ? area.evening : area.day;
+    while (this.walkers.length > target) this.walkers.pop();
+    const s = this.ctx.s;
+    while (this.walkers.length < target) {
+      const w = new Walker(this.map, area.zones, night);
+      const customerChance = (h >= 18 || h < 3) && s.flags.tutorialDone ? (s.flags.dexParty ? 0.55 : 0.35) : 0;
+      if (Math.random() < customerChance) w.makeCustomer();
+      this.walkers.push(w);
+    }
+  }
+
+  private walkerNear(px: number, py: number, radius: number): Walker | undefined {
+    let best: Walker | undefined, bd = radius;
+    for (const w of this.walkers) { const d = Math.hypot(w.x - px, w.y - 6 - py); if (d < bd) { bd = d; best = w; } }
+    return best;
+  }
+
+  private animalNear(px: number, py: number, radius: number): Animal | undefined {
+    return this.animals.find((a) => a.visible && a.z === 0 && Math.hypot(a.x - px, a.y - 4 - py) < radius && (a.kind === 'cat' || a.kind === 'dog'));
   }
 
   private npcNear(px: number, py: number, radius: number): Npc | undefined {
@@ -423,6 +495,12 @@ export class Game {
     const front = this.frontPoint();
     const npc = this.npcNear(front.x, front.y, 16);
     if (npc) { this.talkTo(npc); return true; }
+    const walker = this.walkerNear(front.x, front.y, 15);
+    if (walker) { this.talkToWalker(walker); return true; }
+    const animal = this.animalNear(front.x, front.y, 14);
+    if (animal) { this.pet(animal); return true; }
+    const spot = forageAt(this.ctx.s, this.map.def.id, x, y);
+    if (spot) { this.pickUp(spot); return true; }
     const mc = machineAt(this.ctx.s, this.map.def.id, x, y);
     if (mc) { this.machineMenu(mc); return true; }
     const soil = soilAt(this.ctx.s, this.map.def.id, x, y);
@@ -493,6 +571,11 @@ export class Game {
       return true;
     }
     if (st.id === 'letter_uncle') { this.readLetter(); return true; }
+    if (def.read) {
+      this.ui.narrate(...def.read);
+      if (def.readFlag) this.setFlag(def.readFlag);
+      return true;
+    }
     return false;
   }
 
@@ -589,9 +672,18 @@ export class Game {
     npc.faceTimer = 4;
     const rel = (s.npcs[def.id] ??= { friendship: 0, talkedDay: 0 });
     if (rel.talkedDay !== s.time.day) { rel.talkedDay = s.time.day; rel.friendship += 10; }
+    const offer = this.quests.offerFor(def.id);
+    if (offer) {
+      this.sfx.play('click');
+      this.ui.dialogue(def.id, offer.intro ?? [offer.summary], [
+        { label: 'Mach ich', primary: true, action: () => this.quests.startLine(offer.id) },
+        { label: 'Vielleicht später', action: () => undefined },
+      ], () => this.ctx.bus.emit('talked', { npc: def.id }));
+      return;
+    }
     const group = def.dialogue.find((d) => !d.when || d.when(s))!;
     const lines = group.when ? group.lines : [group.lines[(s.time.day + rel.friendship / 10) % group.lines.length | 0]];
-    const opts = this.servicesFor(def, npc);
+    const opts = [...this.questOptions(def.id), ...this.servicesFor(def, npc)];
     this.sfx.play('click');
     this.ui.dialogue(def.id, lines, opts, () => this.ctx.bus.emit('talked', { npc: def.id }));
   }
@@ -624,6 +716,78 @@ export class Game {
     return opts;
   }
 
+  private questOptions(npcId: string): MenuOption[] {
+    return this.quests.npcOptions(npcId).map((o) => {
+      const check = this.checkQuestAction(o.action);
+      return { label: o.label, hint: check.hint, disabled: !check.ok, primary: check.ok, action: () => this.runQuestAction(o.action) };
+    });
+  }
+
+  private parseQuestAction(action: string): { kind: string; item?: string; qty: number; flag: string } {
+    const [kind, a, b, c] = action.split(':');
+    if (kind === 'pay') return { kind, qty: a === 'debt' ? (this.ctx.s.vars.debt ?? 2000) : Number(a), flag: b };
+    return { kind, item: a, qty: Number(b), flag: c };
+  }
+
+  private checkQuestAction(action: string): { ok: boolean; hint: string } {
+    const q = this.parseQuestAction(action);
+    if (q.kind === 'pay') return { ok: this.ctx.s.money >= q.qty, hint: `${q.qty.toLocaleString('de-DE')} $` };
+    const have = countItem(this.ctx.s, q.item!);
+    return { ok: have >= q.qty, hint: `du hast ${have}/${q.qty}` };
+  }
+
+  private runQuestAction(action: string): void {
+    const q = this.parseQuestAction(action);
+    if (!this.checkQuestAction(action).ok) { this.sfx.play('error'); this.toast(q.kind === 'pay' ? 'Nicht genug Geld.' : 'Dir fehlt noch etwas.'); return; }
+    if (q.kind === 'pay') addMoney(this.ctx, -q.qty);
+    else removeItem(this.ctx.s, q.item!, q.qty);
+    this.sfx.play('coin');
+    this.setFlag(q.flag);
+  }
+
+  setFlag(flag: string): void {
+    if (this.ctx.s.flags[flag]) return;
+    this.ctx.s.flags[flag] = true;
+    this.ctx.bus.emit('flagSet', { flag });
+  }
+
+  private talkToWalker(w: Walker): void {
+    const dx = this.player.x - w.x, dy = this.player.y - w.y;
+    w.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    w.faceTimer = 4;
+    const s = this.ctx.s;
+    const opts: MenuOption[] = [];
+    if (w.customer && !w.served) {
+      for (const b of CHANNELS.strasse.buys) {
+        const have = countItem(s, b.item);
+        if (have <= 0) continue;
+        const n = Math.min(have, 1 + Math.floor(Math.random() * 2));
+        const total = quote(s, 'strasse', b.item, n);
+        opts.push({ label: `${n}× ${ITEMS[b.item].name}`, hint: `${total} $`, primary: true, action: () => { this.sell('strasse', b.item, n); w.served = true; w.line = 'Danke. Man sieht sich.'; } });
+      }
+      opts.push({ label: opts.length ? 'Nichts für dich' : 'Hab nichts dabei', action: () => undefined });
+    }
+    this.sfx.play('click');
+    this.ui.dialogue('', [w.customer && !w.served && opts.length > 1 ? `${w.line} (Straßenpreis heute: ~${unitPrice(s, 'strasse', 'cannabis')} $ für Cannabis)` : w.line], opts, undefined, { name: w.name, title: w.customer ? 'Kundschaft' : 'Passant', look: w.look, id: w.spriteId });
+  }
+
+  private pet(a: Animal): void {
+    a.hearts = 1.5;
+    a.state = 'idle'; a.timer = 2;
+    this.sfx.play('eat');
+    this.ctx.bus.emit('petted', { animal: a.kind });
+    const name = a.name ?? (a.kind === 'cat' ? 'Die Katze' : 'Der Hund');
+    this.toastOnce(`pet:${a.kind}`, a.kind === 'cat' ? `${name} schnurrt zufrieden.` : `${name} wedelt mit dem Schwanz.`);
+  }
+
+  private pickUp(spot: NonNullable<ReturnType<typeof forageAt>>): void {
+    const r = pickForage(this.ctx, this.map.def.id, spot);
+    if (!r.ok) { this.toast(r.msg); this.sfx.play('error'); return; }
+    this.sfx.play('harvest');
+    this.burst(spot.x, spot.y, [P.g4, P.y2, P.white], 8);
+    for (const [item, q] of r.got) this.toast(`+${q} ${ITEMS[item].name}`, item);
+  }
+
   sell(channel: string, item: string, qty: number): void {
     const r = sell(this.ctx, channel, item, qty);
     if (r.ok) { this.sfx.play('coin'); this.toast(r.msg, item); } else { this.sfx.play('error'); this.toast(r.msg); }
@@ -653,7 +817,44 @@ export class Game {
         break;
       }
       case 'laptop': this.ui.narrate('Theos alter Laptop. Ein Lesezeichen führt zu einem Darknet-Marktplatz – aber ohne Zugangsdaten kommst du nicht rein. (Darknet folgt im nächsten Update.) Auf einem Zettel steht: „GHOST?“'); break;
-      case 'chest': this.ui.narrate('Theos alte Kiste. Unter einem doppelten Boden: nichts. Noch nicht. (Lager folgen mit dem Immobilien-Update.)'); break;
+      case 'chest': {
+        const s = this.ctx.s;
+        if (s.flags.chestUnlocked && !s.flags.chestLooted) {
+          addItem(this.ctx, 'theo_notizbuch', 1);
+          addMoney(this.ctx, 400);
+          this.sfx.play('collect');
+          this.ui.narrate('Du tastest den Boden der Kiste ab … ein doppelter Boden! Darunter: ein Bündel Geldscheine (400 $) und ein abgegriffenes Notizbuch.');
+          this.toast('+1 Theos Notizbuch', 'theo_notizbuch');
+          this.setFlag('chestLooted');
+        } else if (s.flags.chestLooted) this.ui.narrate('Der doppelte Boden ist leer. Theo hat nichts mehr übrig gelassen.');
+        else this.ui.narrate('Theos alte Kiste. Ein paar Pullover, ein kaputter Wecker. Irgendwas stimmt mit dem Boden nicht – er klingt hohl.');
+        break;
+      }
+      case 'kushMother': {
+        const s = this.ctx.s;
+        if (!s.flags.kushFound && s.flags.readNotebook) {
+          addItem(this.ctx, 'seed_kush', 4);
+          this.sfx.play('quest');
+          this.ui.narrate('Da ist sie: Theos Kush-Mutterpflanze, violett schimmernd im Licht der Lichtung. Du schneidest vier Stecklinge.', 'Ab jetzt kannst du hier jeden Tag einen Steckling schneiden.');
+          this.toast('+4 Greenfield-Kush-Steckling', 'seed_kush');
+          this.setFlag('kushFound');
+        } else if (s.flags.kushFound) {
+          const key = 'kushMother';
+          if (s.searched[key] === s.time.day) { this.ui.narrate('Die Pflanze braucht Ruhe. Morgen kannst du wieder einen Steckling schneiden.'); break; }
+          s.searched[key] = s.time.day;
+          addItem(this.ctx, 'seed_kush', 1);
+          this.sfx.play('plant');
+          this.toast('+1 Greenfield-Kush-Steckling', 'seed_kush');
+        } else this.ui.narrate('Eine kräftige Pflanze mit violetten Blüten. Jemand hat sich lange um sie gekümmert … aber wer?');
+        break;
+      }
+      case 'trash': {
+        const r = searchTrash(this.ctx, action);
+        if (!r.ok) { this.toastOnce('trash', r.msg); break; }
+        this.sfx.play(r.item || r.money ? 'collect' : 'click');
+        this.toast(r.item ? `${r.msg} +${r.qty} ${ITEMS[r.item].name}` : r.msg, r.item ?? (r.money ? 'coin' : undefined));
+        break;
+      }
       case 'jukebox': this.sfx.play('quest'); this.ui.narrate('Die Jukebox spielt einen kratzigen Song über verlorene Nächte.'); break;
       case 'bus': this.ui.narrate('Bus nach Downtown, Southside & Industrial District – „Fahrbetrieb vorübergehend eingestellt“. (Neue Stadtviertel folgen in Phase 3.)'); break;
       case 'shop': {
@@ -680,6 +881,7 @@ export class Game {
     let summary!: ReturnType<typeof endDay>;
     await this.ui.fade(() => {
       summary = endDay(this.ctx, passedOut, OUTDOOR);
+      this.spawnDaily();
       this.switchMap('home', 2.6 * TILE, 4.4 * TILE, 'down', false);
       this.timeAcc = 0;
       this.notified.clear();
@@ -746,6 +948,12 @@ export class Game {
     const front = this.frontPoint();
     const npc = this.npcNear(front.x, front.y, 16);
     if (npc) { this.ui.setHint(`${K('E')} Mit ${npc.def.name} sprechen`); return; }
+    const walker = this.walkerNear(front.x, front.y, 15);
+    if (walker) { this.ui.setHint(`${K('E')} ${walker.customer && !walker.served ? 'Kundschaft ansprechen' : `Mit ${walker.name} reden`}`); return; }
+    const animal = this.animalNear(front.x, front.y, 14);
+    if (animal) { this.ui.setHint(`${K('E')} ${animal.name ?? (animal.kind === 'cat' ? 'Katze' : 'Hund')} streicheln`); return; }
+    const spot = forageAt(this.ctx.s, this.map.def.id, t.x, t.y);
+    if (spot) { this.ui.setHint(`${K('E')} ${FORAGE[spot.id].name} aufheben`); return; }
     const mc = machineAt(s, mapId, t.x, t.y);
     if (mc) {
       const st = machineStatus(s, mc);

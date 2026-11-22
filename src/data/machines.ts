@@ -25,6 +25,8 @@ export const MACHINES: Record<string, MachineDef> = {
     id: 'drying_rack', name: 'Trockengestell', sprite: 'dryingRack', capacity: 6,
     recipes: [
       { id: 'dry_cannabis', name: 'Cannabis trocknen', inputs: [{ item: 'cannabis_frisch', qty: 1 }], output: { item: 'cannabis', qty: 1 }, minutes: 180 },
+      { id: 'dry_kush', name: 'Kush trocknen', inputs: [{ item: 'kush_frisch', qty: 1 }], output: { item: 'kush', qty: 1 }, minutes: 240 },
+      { id: 'dry_pilze', name: 'Pilze trocknen', inputs: [{ item: 'pilze_frisch', qty: 2 }], output: { item: 'pilze', qty: 1 }, minutes: 120 },
     ],
   },
   pill_press: {

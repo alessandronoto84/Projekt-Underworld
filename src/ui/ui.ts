@@ -12,6 +12,8 @@ import { machineStatus } from '../systems/production';
 import type { DaySummary } from '../systems/day';
 import type { Game } from '../game/game';
 import { PRODUCT_LINES, STAGES, empireLevel, nextStageProgress } from '../data/empire';
+import { STORY } from '../data/story';
+import type { Look } from '../art/characters';
 
 export interface MenuOption { label: string; hint?: string; disabled?: boolean; primary?: boolean; action: () => void }
 
@@ -86,6 +88,7 @@ export class UI {
     const s = this.game.ctx.s;
     const items: [string, string, string, boolean][] = [
       ['Inventar', 'I', 'inventory', true],
+      ['Quests', 'J', 'journal', !!s.flags.tutorialDone],
       ['Handel', 'H', 'trade', !!s.flags.unlock_trade],
       ['Karte', 'M', 'map', !!s.flags.visitedTown],
       ['Menü', 'Esc', 'menu', true],
@@ -111,7 +114,7 @@ export class UI {
     const hotKey = s.inventory.slice(0, HOTBAR_SIZE).map((st) => st ? `${st.id}:${st.qty}:${st.water ?? ''}` : '-').join('|') + `#${s.selected}`;
     if (hotKey !== this.lastHotbar) { this.lastHotbar = hotKey; this.renderHotbar(); }
     const q = this.game.quests;
-    const questKey = `${s.quest.step}|${s.quest.progress}|${this.questCollapsed}|${q.openGoals().map((g) => g.id).join(',')}|${s.stats.earned}|${s.stats.ordersDone}|${empireLevel(s)}`;
+    const questKey = `${JSON.stringify(s.lines)}|${s.vars.debt}|${s.quest.step}|${s.quest.progress}|${this.questCollapsed}|${q.openGoals().map((g) => g.id).join(',')}|${s.stats.earned}|${s.stats.ordersDone}|${empireLevel(s)}`;
     if (questKey !== this.lastQuest) { this.lastQuest = questKey; this.renderQuest(); }
   }
 
@@ -152,10 +155,14 @@ export class UI {
     } else {
       const goals = q.openGoals();
       const next = nextStageProgress(s);
+      const main = q.main();
+      const side = q.activeLines().filter((a) => a.line.kind === 'side');
       this.quest.replaceChildren(...([
         h('div', { class: 'head' }, `Stufe ${lvl} · ${stage.name}`),
-        h('div', { class: 'title' }, 'Bau dein Imperium aus'),
-        goals.length ? h('ul', { class: 'goals' }, goals.map((g) => h('li', {}, g.text))) : null,
+        main ? h('div', { class: 'title' }, main.step.title, (() => { const pr = q.lineProgress(main.line, main.st); return pr ? h('span', { class: 'prog' }, `  ${pr}`) : null; })()) : h('div', { class: 'title' }, 'Bau dein Imperium aus'),
+        main ? h('div', { class: 'text' }, q.stepText(main.step)) : null,
+        side.length ? h('div', { class: 'side' }, `Nebenquest: ${side[0].step.title}${side.length > 1 ? ` (+${side.length - 1})` : ''}`) : null,
+        !main && goals.length ? h('ul', { class: 'goals' }, goals.map((g) => h('li', {}, g.text))) : null,
         next ? h('div', { class: 'next' }, `Nächste Stufe „${next.stage.name}“: `, h('b', {}, next.parts.join(' · '))) : null,
       ].filter((x) => !!x) as HTMLElement[]));
     }
@@ -185,6 +192,7 @@ export class UI {
     if (kind === 'inventory') this.openInventory();
     else if (kind === 'trade') { if (this.game.ctx.s.flags.unlock_trade) this.openTrade(); }
     else if (kind === 'map') this.openMap();
+    else if (kind === 'journal') this.openJournal();
     else if (kind === 'menu') this.openMenu();
   }
 
@@ -327,6 +335,36 @@ export class UI {
     });
   }
 
+  /** Questbuch (J): Hauptgeschichte, Nebenquests, erledigte Quests. */
+  openJournal(): void {
+    this.openModal('journal', () => {
+      const s = this.game.ctx.s, q = this.game.quests;
+      const entry = (lineId: string) => {
+        const line = STORY.find((l) => l.id === lineId)!;
+        const st = s.lines[lineId];
+        const done = !!st?.done;
+        const steps = line.steps.slice(0, done ? line.steps.length : (st?.step ?? 0) + 1).map((step, i) => {
+          const cur = !done && i === st?.step;
+          return h('li', { class: cur ? 'cur' : 'ok' }, cur ? '▶ ' : '✓ ', step.title, cur ? h('div', { class: 'muted' }, q.stepText(step)) : null);
+        });
+        return h('div', { class: `jentry ${done ? 'done' : ''}` },
+          h('div', { class: 'jt' }, line.title, done ? h('span', { class: 'tag' }, 'erledigt') : h('span', { class: `tag ${line.kind}` }, line.kind === 'main' ? 'Hauptquest' : 'Nebenquest')),
+          h('div', { class: 'muted', style: 'font-size:14px;margin:2px 0 4px' }, line.summary),
+          h('ul', { class: 'jsteps' }, steps),
+          done ? h('div', { class: 'muted', style: 'font-size:13px' }, `Belohnung: ${line.reward.text}`) : null);
+      };
+      const started = STORY.filter((l) => s.lines[l.id]);
+      const mainLines = started.filter((l) => l.kind === 'main'), sideLines = started.filter((l) => l.kind === 'side');
+      const offers = STORY.filter((l) => l.kind === 'side' && !s.lines[l.id] && l.available(s) && l.giver);
+      return h('div', { class: 'modal panel journal' }, this.header('Questbuch'),
+        h('h3', {}, 'Hauptgeschichte'), mainLines.length ? mainLines.map((l) => entry(l.id)) : h('div', { class: 'empty' }, 'Noch keine.'),
+        h('h3', {}, 'Imperium-Ziele'), q.openGoals().length ? h('ul', { class: 'jsteps' }, q.openGoals().map((g) => h('li', { class: 'cur' }, '◆ ', g.text))) : h('div', { class: 'empty' }, 'Alle aktuellen Ziele erreicht.'),
+        h('h3', {}, 'Nebenquests'), sideLines.length ? sideLines.map((l) => entry(l.id)) : h('div', { class: 'empty' }, 'Noch keine. Sprich mit den Leuten in Greenfield.'),
+        offers.length ? h('div', { class: 'muted', style: 'font-size:13px;margin-top:6px' }, `Tipp: ${offers.map((o) => NPCS[o.giver!]?.name).filter(Boolean).join(', ')} ${offers.length > 1 ? 'haben' : 'hat'} vielleicht etwas für dich.`) : null,
+      );
+    });
+  }
+
   openMenu(): void {
     this.openModal('menu', () => h('div', { class: 'modal panel', style: 'min-width:320px' }, this.header('Pause'),
       h('div', { style: 'display:flex;flex-direction:column;gap:8px' },
@@ -429,14 +467,14 @@ export class UI {
 
   /* ====================================================== Dialog & Menü */
 
-  dialogue(npcId: string, lines: string[], options: MenuOption[] = [], onEnd?: () => void): void {
+  dialogue(npcId: string, lines: string[], options: MenuOption[] = [], onEnd?: () => void, speaker?: { name: string; title: string; look: Look; id: string }): void {
     this.closeContext();
     this.dialogEl?.remove();
-    const npc = NPCS[npcId] as (typeof NPCS)[string] | undefined;
+    const npc = (NPCS[npcId] as (typeof NPCS)[string] | undefined) ?? (speaker ? { name: speaker.name, title: speaker.title, look: speaker.look, id: speaker.id } : undefined);
     let pc: HTMLCanvasElement | null = null;
     if (npc) {
       pc = document.createElement('canvas');
-      pc.width = 16; pc.height = 15; pc.getContext('2d')!.drawImage(portrait(npcId, npc.look), 0, 0);
+      pc.width = 16; pc.height = 15; pc.getContext('2d')!.drawImage(portrait(speaker?.id ?? npcId, npc.look), 0, 0);
     }
     const lineEl = h('div', { class: 'line' });
     const optsEl = h('div', { class: 'opts' });

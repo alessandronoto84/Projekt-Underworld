@@ -17,8 +17,8 @@ src/
   data/      Spielinhalte als Daten: Items, Pflanzen, Maschinen, Handel, NPCs, Tutorial, Imperium-Stufen, Karten
   systems/   Reine Spiellogik ohne DOM (testbar): Zustand, Inventar, Anbau, Produktion, Markt, Tag, Quests, Speichern
   world/     Laufzeit-Karte (Kollision, Türen, Objekte), Pfadsuche
-  entities/  Figuren (Spieler, NPCs mit Tagesablauf)
-  game/      Game (Spielschleife, Interaktionen), Renderer (Welt, Licht, Wetter), Sound
+  entities/  Figuren (Spieler, NPCs mit Tagesablauf, Passanten, Tiere)
+  game/      Game (Spielschleife, Interaktionen), Renderer (Welt, Licht, Wetter), Ambient (Partikel), Sound
   ui/        HTML-Oberfläche (HUD, Dialoge, Kontextmenüs, Panels)
   tools/     Entwickler-Werkzeuge (Sprite-Galerie)
 ```
@@ -38,6 +38,9 @@ Regel: `systems/` kennt weder `ui/` noch `game/`. Kommunikation läuft über den
 | Neue Karte / neues Viertel | `data/maps/*.ts`, in `game/game.ts → MAP_DEFS` eintragen |
 | Neue Imperium-Stufe / Freischaltung | `data/empire.ts` (setzt Flag `stageN`) |
 | Tutorial-Schritt / Ziel | `data/tutorial.ts` |
+| Hauptgeschichte / Nebenquest | `data/story.ts` (Questreihen mit Schritten, Gesprächsoptionen, Belohnungen) |
+| Fundstücke & Mülltonnen-Beute | `data/forage.ts` (täglich neu ausgelegt) |
+| Tiere & Passanten | `data/life.ts` |
 
 ## Spielstand
 

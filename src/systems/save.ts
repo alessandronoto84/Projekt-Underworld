@@ -20,6 +20,8 @@ type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 /** MIGRATIONS[n] hebt einen Stand von Version n auf n+1. */
 const MIGRATIONS: Record<number, Migration> = {
   1: migrateV1toV2,
+  // v3: Fundstücke, Questreihen, Story-Werte – Felder werden durch fillDefaults ergänzt.
+  2: (raw) => ({ ...raw, version: 3 }),
 };
 
 /**
@@ -108,7 +110,7 @@ function fillDefaults(s: GameState): GameState {
     else if (isPlainObject(v) && isPlainObject(out[k])) {
       for (const [k2, v2] of Object.entries(v as Record<string, unknown>)) {
         const o = out[k] as Record<string, unknown>;
-        if (o[k2] === undefined && !['farms', 'machines', 'flags', 'npcs', 'market'].includes(k)) o[k2] = v2;
+        if (o[k2] === undefined && !['farms', 'machines', 'flags', 'npcs', 'market', 'forage', 'searched', 'lines', 'vars'].includes(k)) o[k2] = v2;
       }
     }
   }

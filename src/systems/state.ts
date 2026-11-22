@@ -1,8 +1,9 @@
 import type { Dir } from '../core/types';
 import { EventBus } from '../core/events';
+import type { ForageSpot } from './forage';
 
 /** Aktuelle Spielstand-Version. Bei Strukturänderungen erhöhen + Migration in save.ts ergänzen. */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export const INVENTORY_SIZE = 24;
 export const HOTBAR_SIZE = 8;
@@ -47,7 +48,17 @@ export interface GameState {
   stats: { earned: number; spent: number; harvested: number; sold: number; ordersDone: number };
   ledger: DayLedger[];
   nextUid: number;
+  /** Fundstücke pro Karte (täglich neu). */
+  forage: Record<string, ForageSpot[]>;
+  /** Durchsuchte Stellen → Tag der letzten Suche. */
+  searched: Record<string, number>;
+  /** Questreihen (Hauptgeschichte, Nebenquests). */
+  lines: Record<string, LineState>;
+  /** Numerische Story-Werte (z. B. Fristen). */
+  vars: Record<string, number>;
 }
+
+export interface LineState { step: number; progress: number; done?: boolean; failed?: boolean }
 
 export interface Ctx { s: GameState; bus: EventBus }
 
@@ -76,6 +87,10 @@ export function createNewGame(seed = Date.now() % 1_000_000): GameState {
     stats: { earned: 0, spent: 0, harvested: 0, sold: 0, ordersDone: 0 },
     ledger: [{ day: 1, income: 0, expenses: 0 }],
     nextUid: 2,
+    forage: {},
+    searched: {},
+    lines: {},
+    vars: {},
   };
 }
 

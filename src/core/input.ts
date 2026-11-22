@@ -1,13 +1,13 @@
 /** Eingabe-Abstraktion: Tastatur + Maus. Spätere Touch-Steuerung setzt dieselben Aktionen. */
 export type Action =
   | 'up' | 'down' | 'left' | 'right'
-  | 'use' | 'interact' | 'inventory' | 'trade' | 'map' | 'menu' | 'run';
+  | 'use' | 'interact' | 'inventory' | 'trade' | 'map' | 'menu' | 'run' | 'journal';
 
 const KEYMAP: Record<string, Action> = {
   KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down',
   KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
   Space: 'use', KeyE: 'interact', KeyF: 'interact', Enter: 'interact',
-  KeyI: 'inventory', Tab: 'inventory', KeyH: 'trade', KeyM: 'map', Escape: 'menu',
+  KeyI: 'inventory', Tab: 'inventory', KeyH: 'trade', KeyM: 'map', KeyJ: 'journal', KeyQ: 'journal', Escape: 'menu',
   ShiftLeft: 'run', ShiftRight: 'run',
 };
 

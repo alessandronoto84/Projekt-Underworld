@@ -4,7 +4,7 @@ import { CROPS } from '../data/crops';
 import { ITEMS } from '../data/items';
 import { MACHINES } from '../data/machines';
 import { NPCS } from '../data/npcs';
-import { drawDumpster } from '../art/objects';
+import { drawDumpster, drawAnimal, drawForage, drawLog, drawStump, drawHuntingStand } from '../art/objects';
 
 const root = document.getElementById('root')!;
 const SCALE = Number(new URLSearchParams(location.search).get('scale') ?? 4);
@@ -40,3 +40,8 @@ show(machines, drawDumpster(), 'Container');
 
 const people = section('Figuren');
 for (const n of Object.values(NPCS)) show(people, characterFrame(n.id, n.look, 'down', 0), n.name, true);
+
+const life = section('Tiere & Wald');
+for (const k of ['pigeon', 'crow', 'cat', 'dog', 'duck'] as const) for (let f = 0; f < 2; f++) show(life, drawAnimal(k, f, 0), `${k} ${f}`);
+for (const k of ['hemp', 'mushroom', 'bottle', 'watch', 'keys', 'kushMother'] as const) show(life, drawForage(k), k);
+show(life, drawLog(), 'Baumstamm'); show(life, drawStump(), 'Stumpf'); show(life, drawHuntingStand(), 'Hochsitz');

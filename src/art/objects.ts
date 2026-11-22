@@ -445,7 +445,7 @@ export function drawWorkbench(): HTMLCanvasElement {
 
 /* ---------------------------------------------------------------- Pflanzen */
 
-export type CropArt = 'cannabis' | 'tomate';
+export type CropArt = 'cannabis' | 'kush' | 'tomate';
 
 /** stage 0 = frisch gepflanzt … maxStage = erntereif */
 export function drawCrop(kind: CropArt, stage: number, maxStage: number): HTMLCanvasElement {
@@ -460,7 +460,8 @@ export function drawCrop(kind: CropArt, stage: number, maxStage: number): HTMLCa
     p.outline();
     return p.canvas;
   }
-  if (kind === 'cannabis') {
+  if (kind === 'cannabis' || kind === 'kush') {
+    const kush = kind === 'kush';
     const lvl = Math.max(1, Math.min(3, stage));
     const leaves: [number, number, number, string, string][] =
       lvl === 1 ? [[8, 23, 4, P.g4, P.g5]]
@@ -472,9 +473,10 @@ export function drawCrop(kind: CropArt, stage: number, maxStage: number): HTMLCa
     for (const [x, y, L, c, hi] of leaves) fanLeaf(p, x, y, L, c, hi);
     if (ripe) {
       // Blütenstand (Cola) mit Härchen und „Frost“
-      p.rect(7, 2, 3, 7, P.g4).rect(6, 4, 5, 4, P.g4).hline(6, 8, 5, P.g2).vline(10, 4, 4, P.g2);
-      p.px(8, 1, P.g5).px(7, 3, P.g5).px(9, 5, P.g5).px(6, 5, P.y1).px(10, 4, P.y1).px(8, 7, P.y0).px(7, 6, P.y1);
-      for (const [bx, by] of [[3, 13], [13, 13]]) p.rect(bx - 1, by - 1, 3, 2, P.g4).px(bx - 1, by - 1, P.g5).px(bx + 1, by, P.y1);
+      const bud = kush ? P.v3 : P.g4, budD = kush ? P.v2 : P.g2, frost = kush ? P.white : P.g5;
+      p.rect(7, 2, 3, 7, bud).rect(6, 4, 5, 4, bud).hline(6, 8, 5, budD).vline(10, 4, 4, budD);
+      p.px(8, 1, frost).px(7, 3, frost).px(9, 5, frost).px(6, 5, P.y1).px(10, 4, P.y1).px(8, 7, P.y0).px(7, 6, P.y1);
+      for (const [bx, by] of [[3, 13], [13, 13]]) p.rect(bx - 1, by - 1, 3, 2, bud).px(bx - 1, by - 1, frost).px(bx + 1, by, P.y1);
     }
     return p.canvas;
   } else {
@@ -518,7 +520,8 @@ function fanLeaf(p: Painter, cx: number, cy: number, L: number, c: string, hi: s
 
 export type IconKind =
   | 'hoe' | 'can' | 'seedBag' | 'clone' | 'budFresh' | 'budBag' | 'tomato' | 'kit' | 'pills' | 'brick' | 'baggie'
-  | 'rackItem' | 'pressItem' | 'packItem' | 'sandwich' | 'coffee' | 'letter' | 'coin';
+  | 'rackItem' | 'pressItem' | 'packItem' | 'sandwich' | 'coffee' | 'letter' | 'coin'
+  | 'mushroom' | 'mushroomBag' | 'bottle' | 'watch' | 'notebook' | 'keys';
 
 export function drawIcon(kind: IconKind, tint: string = P.g3): HTMLCanvasElement {
   const p = new Painter(16, 16);
@@ -539,16 +542,16 @@ export function drawIcon(kind: IconKind, tint: string = P.g3): HTMLCanvasElement
     case 'clone':
       p.rect(5, 10, 6, 4, P.r1).hline(4, 10, 8, P.r2).hline(5, 13, 6, P.r0);
       p.vline(8, 6, 4, P.g2);
-      fanLeaf(p, 8, 7, 2, P.g3, P.g4);
+      fanLeaf(p, 8, 7, 2, P.g3, tint === P.g3 ? P.g4 : tint);
       break;
     case 'budFresh':
       fanLeaf(p, 8, 12, 3, P.g2, P.g3);
-      p.ellipse(8, 8, 3, 4, P.g3).ellipse(7, 7, 2, 2, P.g4).px(6, 9, P.y1).px(10, 7, P.y1).px(8, 5, P.g5).px(9, 10, P.y0);
+      p.ellipse(8, 8, 3, 4, tint === P.g3 ? P.g3 : P.v2).ellipse(7, 7, 2, 2, tint === P.g3 ? P.g4 : tint).px(6, 9, P.y1).px(10, 7, P.y1).px(8, 5, tint === P.g3 ? P.g5 : P.white).px(9, 10, P.y0);
       p.vline(8, 12, 3, P.g1);
       break;
     case 'budBag':
       p.rect(3, 4, 10, 10, P.white).rect(4, 5, 8, 8, P.w4).hline(3, 4, 10, P.r2).hline(3, 5, 10, P.s4);
-      p.ellipse(7, 10, 2, 2, P.g3).ellipse(10, 9, 2, 2, P.g4).px(6, 9, P.g5).px(9, 11, P.y1).px(11, 8, P.g5);
+      p.ellipse(7, 10, 2, 2, tint === P.g3 ? P.g3 : P.v2).ellipse(10, 9, 2, 2, tint === P.g3 ? P.g4 : tint).px(6, 9, P.g5).px(9, 11, P.y1).px(11, 8, P.g5);
       break;
     case 'tomato':
       p.ellipse(8, 9, 5, 4, P.r2).ellipse(6, 8, 2, 2, P.r3).px(5, 7, P.r4);
@@ -599,6 +602,27 @@ export function drawIcon(kind: IconKind, tint: string = P.g3): HTMLCanvasElement
     case 'coin':
       p.ellipse(8, 8, 5, 5, P.y1).ellipse(7, 7, 3, 3, P.y2).vline(8, 5, 6, P.y0);
       break;
+    case 'mushroom':
+      for (const [x, y, r] of [[5, 7, 3], [11, 9, 2], [8, 11, 2]] as const) {
+        p.vline(x, y + 1, 4, P.cream).ellipse(x, y, r, Math.max(1, r - 1), P.b4).px(x - 1, y - 1, P.b5).px(x + 1, y, P.cream);
+      }
+      break;
+    case 'mushroomBag':
+      p.rect(3, 4, 10, 10, P.white).rect(4, 5, 8, 8, P.w4).hline(3, 4, 10, P.r2).hline(3, 5, 10, P.s4);
+      p.ellipse(7, 10, 2, 1, P.b4).vline(7, 11, 2, P.cream).ellipse(10, 8, 2, 1, P.b3).vline(10, 9, 2, P.cream);
+      break;
+    case 'bottle':
+      p.rect(6, 6, 4, 8, P.g2).vline(9, 6, 8, P.g1).rect(7, 2, 2, 4, P.g2).px(7, 1, P.s3).px(8, 1, P.s3).vline(7, 7, 4, P.g4).rect(6, 9, 4, 2, P.cream);
+      break;
+    case 'watch':
+      p.rect(7, 1, 2, 4, P.b2).rect(7, 11, 2, 4, P.b2).ellipse(8, 8, 4, 4, P.y1).ellipse(8, 8, 3, 3, P.white).vline(8, 6, 3, P.ink).hline(8, 8, 2, P.ink);
+      break;
+    case 'notebook':
+      p.rect(3, 2, 10, 12, P.r1).vline(3, 2, 12, P.r0).hline(5, 5, 6, P.cream).hline(5, 7, 4, P.cream).rect(11, 2, 1, 12, P.cream).px(9, 11, P.y2);
+      break;
+    case 'keys':
+      p.ellipse(5, 6, 3, 3, P.s3).ellipse(5, 6, 1, 1, P.ink).hline(7, 7, 6, P.s3).px(11, 8, P.s3).px(13, 8, P.s3).px(4, 11, P.w3).px(3, 12, P.w3).px(5, 12, P.w3).px(4, 13, P.w2);
+      break;
   }
   p.outline();
   return p.canvas;
@@ -642,6 +666,114 @@ export function drawDumpster(): HTMLCanvasElement {
   p.hline(13, 11, 4, P.teal).vline(13, 11, 5, P.teal).vline(17, 11, 5, P.teal).hline(13, 13, 4, P.teal);
   p.px(20, 12, P.y2).px(21, 11, P.y2).px(22, 12, P.y2).px(23, 13, P.y2).px(24, 14, P.y2);
   p.rect(3, 20, 3, 2, P.s1).rect(26, 20, 3, 2, P.s1);
+  p.outline();
+  return p.canvas;
+}
+
+/* --------------------------------------------------------------- Wald & Funde */
+
+export function drawLog(): HTMLCanvasElement {
+  const p = new Painter(32, 14);
+  p.rect(2, 3, 26, 8, P.b2).hline(2, 3, 26, P.b3).hline(2, 10, 26, P.b1);
+  p.ellipse(28, 7, 3, 4, P.b4).ellipse(28, 7, 1, 2, P.b3).px(10, 5, P.b1).px(18, 7, P.b1);
+  p.px(8, 2, P.g3).px(9, 2, P.g4).px(20, 2, P.g3);
+  p.outline();
+  return p.canvas;
+}
+
+export function drawStump(): HTMLCanvasElement {
+  const p = new Painter(16, 14);
+  p.rect(3, 5, 10, 7, P.b2).vline(12, 5, 7, P.b1).ellipse(8, 5, 5, 2, P.b4).ellipse(8, 5, 2, 1, P.b3).px(2, 11, P.b2).px(13, 11, P.b2);
+  p.outline();
+  return p.canvas;
+}
+
+export function drawHuntingStand(): HTMLCanvasElement {
+  const p = new Painter(24, 44);
+  for (const x of [3, 19]) p.rect(x, 14, 2, 29, P.b2);
+  for (let y = 18; y < 42; y += 5) p.hline(5, y, 14, P.b3);
+  p.rect(1, 6, 22, 9, P.b3).hline(1, 6, 22, P.b4).rect(4, 8, 16, 4, P.b1);
+  for (let i = 0; i < 5; i++) p.hline(i, 5 - i, 24 - i * 2, i % 2 ? P.g1 : P.g2);
+  p.outline();
+  return p.canvas;
+}
+
+export type ForageArt = 'hemp' | 'mushroom' | 'bottle' | 'watch' | 'keys' | 'kushMother';
+
+/** Fundstücke am Boden. */
+export function drawForage(kind: ForageArt): HTMLCanvasElement {
+  if (kind === 'hemp' || kind === 'kushMother') {
+    const p = new Painter(16, 22);
+    const c = kind === 'kushMother' ? P.v3 : P.g4;
+    p.vline(8, 6, 16, P.g1).ellipse(8, 21, 3, 1, P.soil2);
+    fanLeaf(p, 4, 21, 4, P.g3, P.g4);
+    fanLeaf(p, 12, 21, 4, P.g3, P.g4);
+    fanLeaf(p, 8, 15, 4, P.g3, P.g4);
+    p.rect(7, 3, 3, 6, c).rect(6, 5, 5, 3, c).px(8, 2, P.white).px(7, 5, P.y1).px(9, 7, P.y1);
+    p.outline(P.g0);
+    return p.canvas;
+  }
+  const p = new Painter(16, 16);
+  if (kind === 'mushroom') {
+    for (const [x, y, r] of [[5, 9, 3], [11, 11, 2], [8, 13, 2]] as const) {
+      p.vline(x, y + 1, 3, P.cream).ellipse(x, y, r, Math.max(1, r - 1), P.b4).px(x - 1, y - 1, P.b5).px(x + 1, y, P.cream);
+    }
+  } else if (kind === 'bottle') {
+    p.rect(3, 10, 9, 3, P.g2).hline(3, 10, 9, P.g4).rect(12, 11, 2, 1, P.g2).rect(5, 10, 3, 3, P.cream);
+  } else if (kind === 'watch') {
+    p.ellipse(8, 11, 3, 2, P.y1).ellipse(8, 11, 2, 1, P.white).hline(2, 11, 3, P.b2).hline(11, 11, 3, P.b2);
+  } else {
+    p.ellipse(6, 11, 2, 2, P.s3).px(6, 11, P.ink).hline(8, 11, 4, P.s3).px(11, 12, P.s3).px(4, 13, P.w3);
+  }
+  p.outline();
+  return p.canvas;
+}
+
+/* ------------------------------------------------------------------ Tiere */
+
+export type AnimalKind = 'pigeon' | 'cat' | 'dog' | 'duck' | 'crow';
+
+/** Tier-Frame (16×16), Blick nach rechts. frame 0/1 = Laufen/Picken. */
+export function drawAnimal(kind: AnimalKind, frame: number, variant = 0): HTMLCanvasElement {
+  const p = new Painter(16, 16);
+  const f = frame % 2;
+  switch (kind) {
+    case 'pigeon':
+    case 'crow': {
+      const body = kind === 'crow' ? P.ink : [P.s3, P.s2, P.cream][variant % 3];
+      const wing = kind === 'crow' ? P.s0 : P.s1;
+      p.ellipse(8, 11, 4, 3, body).rect(5, 10, 5, 2, wing);
+      const hy = f ? 10 : 7, hx = f ? 12 : 11;
+      p.rect(hx, hy, 3, 3, kind === 'crow' ? P.ink : P.s2).px(hx + 2, hy + 1, P.y1).px(hx + 1, hy, P.ink);
+      if (kind === 'pigeon') p.px(hx, hy + 2, P.tealDark);
+      p.hline(3, 11, 2, wing).px(7, 14, P.r3).px(9, 14, P.r3);
+      break;
+    }
+    case 'cat': {
+      const fur = [P.y0, P.s2, P.ink, P.cream][variant % 4], dark = [P.b2, P.s1, P.outline, P.sand0][variant % 4];
+      p.rect(3, 8, 9, 4, fur).hline(3, 11, 9, dark);
+      p.rect(11, 5, 4, 4, fur).px(11, 4, fur).px(14, 4, fur).px(12, 6, P.g4).px(14, 6, P.g4).px(13, 7, P.r4);
+      const legs = f ? [4, 6, 9, 11] : [3, 5, 10, 12];
+      for (const x of legs) p.vline(x, 12, 2, dark);
+      p.vline(2, 5, 4, fur).px(1, 4, fur).px(3, 8, fur);
+      break;
+    }
+    case 'dog': {
+      const fur = [P.b4, P.b2, P.cream][variant % 3], dark = [P.b3, P.b1, P.sand0][variant % 3];
+      p.rect(2, 7, 10, 5, fur).hline(2, 11, 10, dark);
+      p.rect(10, 3, 5, 5, fur).rect(14, 5, 2, 2, fur).px(15, 5, P.ink).px(12, 4, P.ink).rect(10, 3, 2, 3, dark);
+      const legs = f ? [3, 5, 9, 11] : [2, 4, 10, 12];
+      for (const x of legs) p.vline(x, 12, 3, dark);
+      p.px(1, 6 + f, fur).px(0, 5 + f, fur);
+      break;
+    }
+    case 'duck': {
+      p.ellipse(7, 11, 5, 3, P.white).hline(3, 13, 9, P.s4).rect(10, 5, 4, 4, P.g2).px(14, 7, P.y1).px(15, 7, P.y1).px(12, 6, P.ink).hline(10, 9, 3, P.white);
+      p.rect(4, 10, 4, 2, P.s4);
+      if (f) p.px(2, 9, P.white);
+      break;
+    }
+  }
   p.outline();
   return p.canvas;
 }

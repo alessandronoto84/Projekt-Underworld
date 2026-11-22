@@ -19,5 +19,6 @@ export interface CropDef {
 
 export const CROPS: Record<string, CropDef> = {
   cannabis: { id: 'cannabis', name: 'Cannabis', seed: 'seed_cannabis', harvest: 'cannabis_frisch', growDays: 3, yield: [1, 2], art: 'cannabis', stages: 3 },
+  kush: { id: 'kush', name: 'Greenfield Kush', seed: 'seed_kush', harvest: 'kush_frisch', growDays: 4, yield: [1, 2], art: 'kush', stages: 3 },
   tomate: { id: 'tomate', name: 'Tomate', seed: 'seed_tomate', harvest: 'tomate', growDays: 3, regrowDays: 2, yield: [1, 2], art: 'tomate', stages: 3 },
 };

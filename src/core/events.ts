@@ -20,6 +20,10 @@ export interface GameEvents {
   toast: { text: string; icon?: string };
   questChanged: Record<string, never>;
   unlocked: { feature: string };
+  looted: { item: string; qty: number; map: string };
+  flagSet: { flag: string };
+  petted: { animal: string };
+  questDone: { line: string; text: string };
 }
 
 type Handler<T> = (payload: T) => void;

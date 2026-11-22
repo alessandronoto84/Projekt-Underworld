@@ -6,6 +6,8 @@ import { TILE } from '../core/types';
 import { cropStage } from '../systems/farming';
 import { machineStatus } from '../systems/production';
 import { darkness } from '../systems/time';
+import { drawForage } from '../art/objects';
+import { FORAGE } from '../data/forage';
 import type { Game } from './game';
 
 interface Drawable { sortY: number; draw: (c: CanvasRenderingContext2D) => void }
@@ -118,6 +120,21 @@ export class Renderer {
       ellipse(c, n.x, n.y, 6, 2);
       list.push({ sortY: n.y, draw: (cc) => cc.drawImage(n.sprite(), Math.round(n.x - 8), Math.round(n.y - 24)) });
     }
+    for (const w of g.walkers) {
+      ellipse(c, w.x, w.y, 6, 2);
+      list.push({ sortY: w.y, draw: (cc) => cc.drawImage(w.sprite(), Math.round(w.x - 8), Math.round(w.y - 24)) });
+    }
+    for (const a of g.animals) {
+      if (!a.visible) continue;
+      if (a.z < 40) ellipse(c, a.x, a.y, a.kind === 'dog' ? 6 : 4, 1);
+      list.push({ sortY: a.y + (a.z > 0 ? 1000 : 0), draw: (cc) => cc.drawImage(a.sprite(), Math.round(a.x - 8), Math.round(a.y - 14 - a.z)) });
+    }
+    for (const f of s.forage[m.def.id] ?? []) {
+      if (!visible(f.x, f.y)) continue;
+      const def = FORAGE[f.id];
+      const spr = sprite(`forage:${def.art}`, () => drawForage(def.art));
+      list.push({ sortY: f.y * TILE + 12, draw: (cc) => cc.drawImage(spr, f.x * TILE, f.y * TILE + 16 - spr.height) });
+    }
     const p = g.player;
     ellipse(c, p.x, p.y, 6, 2);
     list.push({ sortY: p.y, draw: (cc) => { cc.drawImage(p.sprite(), Math.round(p.x - 8), Math.round(p.y - 24)); this.drawToolSwing(g, cc); } });
@@ -130,12 +147,15 @@ export class Renderer {
       c.fillRect(Math.round(pt.x), Math.round(pt.y), pt.size, pt.size);
     }
 
+    g.ambient.drawWorld(c);
     this.drawLighting(g, t, glow);
+    g.ambient.drawGlow(c);
     if (s.weather === 'rain' && m.def.outdoor) this.drawRain(dt);
 
     // Welt-UI (über dem Licht, damit gut lesbar)
     this.drawTarget(g, t);
     this.drawMachineBubbles(g, t);
+    this.drawLifeMarkers(g, t);
     this.drawQuestMarker(g, t);
   }
 
@@ -269,6 +289,33 @@ export class Renderer {
         const bob = Math.round(Math.sin(t * 5) * 1.5);
         c.drawImage(bubbleSprite(), cx - 6, top - 12 + bob);
       }
+    }
+  }
+
+  /** Glitzern auf Fundstücken, Herzen bei Tieren, Markierung für Kundschaft. */
+  private drawLifeMarkers(g: Game, t: number): void {
+    const c = this.ctx, s = g.ctx.s;
+    for (const f of s.forage[g.map.def.id] ?? []) {
+      const ph = (t * 1.3 + f.x * 0.7 + f.y * 0.3) % 2.2;
+      if (ph > 0.5) continue;
+      const k = ph < 0.25 ? 1 : 2;
+      const x = f.x * TILE + 11, y = f.y * TILE + 4;
+      c.fillStyle = P.white;
+      c.fillRect(x, y - k, 1, k * 2 + 1); c.fillRect(x - k, y, k * 2 + 1, 1);
+    }
+    for (const a of g.animals) {
+      if (a.hearts <= 0) continue;
+      const y = Math.round(a.y - 20 - (1.5 - a.hearts) * 8);
+      c.fillStyle = P.r3;
+      c.fillRect(Math.round(a.x) - 2, y, 2, 1); c.fillRect(Math.round(a.x) + 1, y, 2, 1); c.fillRect(Math.round(a.x) - 2, y + 1, 5, 1); c.fillRect(Math.round(a.x) - 1, y + 2, 3, 1); c.fillRect(Math.round(a.x), y + 3, 1, 1);
+    }
+    const bob = Math.round(Math.sin(t * 3) * 1);
+    for (const w of g.walkers) {
+      if (!w.customer || w.served) continue;
+      const x = Math.round(w.x) - 3, y = Math.round(w.y) - 33 + bob;
+      c.fillStyle = P.ink; c.fillRect(x - 1, y - 1, 9, 8);
+      c.fillStyle = P.white; c.fillRect(x, y, 7, 6); c.fillRect(x + 2, y + 6, 2, 1);
+      c.fillStyle = P.g3; c.fillRect(x + 3, y + 1, 1, 4); c.fillRect(x + 1, y + 2, 1, 1); c.fillRect(x + 5, y + 2, 1, 1); c.fillRect(x + 2, y + 3, 3, 1);
     }
   }
 
